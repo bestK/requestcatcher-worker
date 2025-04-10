@@ -1,5 +1,4 @@
 import viewHtml from './public/view.html'
-
 import indexHtml from './public/index.html'
 
 export default {
