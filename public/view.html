@@ -183,8 +183,7 @@
 
   <div class="endpoint-info">
     <h2>API 端点</h2>
-    <p>请求地址: <code id="endpoint-url">https://your-worker.workers.dev/myapi</code></p>
-    <p>查看地址: <code id="endpoint-view-url">https://your-worker.workers.dev/myapi/view</code></p>
+    <p>请求地址: <code id="endpoint-url">https://your-worker.workers.dev/myapi</code></p> 
   </div>
 
   <div class="refresh-control">
@@ -203,14 +202,8 @@
     let lastLogs = [];
 
     function updateEndpointInfo() {
-      const host = window.location.host;
-      const protocol = window.location.protocol;
-      const endpointUrl = `${protocol}//${host}/${endpoint}`;
-      const endpointViewUrl = `${protocol}//${host}/${endpoint}/view`;
-
-      document.getElementById('endpoint-url').textContent = endpointUrl;
-      document.getElementById('endpoint-view-url').textContent = endpointViewUrl;
-      
+      const endpointUrl =  window.location.href.split('/view')[0];
+      document.getElementById('endpoint-url').textContent = endpointUrl; 
     }
 
     // 配置面板折叠控制
