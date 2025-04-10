@@ -27,6 +27,14 @@ export default {
 
     // 获取日志
     if (action === "api" && pathParts[2] === "logs") {
+      if (request.method === "DELETE") {
+        // 清除日志
+        await env.KV.delete(keyLog);
+        return new Response("Logs cleared", {
+          headers: { "Content-Type": "text/plain" },
+        });
+      }
+      
       const logs = await env.KV.get(keyLog);
       return new Response(logs || "[]", {
         headers: { "Content-Type": "application/json" },
