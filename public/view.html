@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Request Logs Viewer</title>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    pre { background: #f4f4f4; padding: 1em; overflow: auto; }
+    .log-entry { margin-bottom: 1.5em; border-bottom: 1px solid #ccc; padding-bottom: 1em; }
+    .config-panel {
+      background: #f8f8f8;
+      padding: 1em;
+      margin-bottom: 2em;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .config-content {
+      display: none;
+    }
+    .config-content.show {
+      display: block;
+    }
+    .config-header {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      padding: 0.5em 0;
+    }
+    .config-header h2 {
+      margin: 0;
+    }
+    .config-header:hover {
+      opacity: 0.8;
+    }
+    .toggle-icon {
+      margin-right: 0.5em;
+      transition: transform 0.3s;
+    }
+    .toggle-icon.open {
+      transform: rotate(90deg);
+    }
+    .path {
+      color: #2563eb;
+      font-family: monospace;
+      padding: 0.2em 0.4em;
+      background: #e5e7eb;
+      border-radius: 4px;
+      margin-right: 0.5em;
+    }
+    .query {
+      color: #059669;
+      font-size: 0.9em;
+    }
+    .form-group {
+      margin-bottom: 1em;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5em;
+      font-weight: bold;
+    }
+    .form-group input[type="text"],
+    .form-group textarea {
+      width: 100%;
+      padding: 0.5em;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      padding: 0.5em 1em;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 0.5em;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    .refresh-control {
+      margin: 1em 0;
+      padding: 1em;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 1em;
+    }
+    .refresh-status {
+      color: #666;
+      font-size: 0.9em;
+    }
+    .refresh-control button.active {
+      background: #f44336;
+    }
+    .new-log {
+      animation: highlight 2s ease-out;
+    }
+    @keyframes highlight {
+      0% { background-color: #fff3cd; }
+      100% { background-color: transparent; }
+    }
+  </style>
+</head>
+<body>
+  <h1>📡 Request Logs Viewer</h1>
+  
+  <div class="config-panel">
+    <div class="config-header" onclick="toggleConfig()">
+      <span class="toggle-icon">▶</span>
+      <h2>响应配置</h2>
+    </div>
+    <div class="config-content" id="configContent">
+      <form id="responseConfig">
+        <div class="form-group">
+          <label>状态码:</label>
+          <input type="number" id="statusCode" value="200" min="100" max="599">
+        </div>
+        <div class="form-group">
+          <label>响应头 (JSON格式):</label>
+          <textarea id="headers" rows="4">{
+  "Content-Type": "application/json"
+}</textarea>
+        </div>
+        <div class="form-group">
+          <label>响应体:</label>
+          <textarea id="body" rows="6">{
+  "message": "Hello World"
+}</textarea>
+        </div>
+        <button type="submit">保存配置</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="refresh-control">
+    <button id="toggleRefresh">停止自动刷新</button>
+    <button onclick="loadLogs()">手动刷新</button>
+    <span class="refresh-status">每3秒自动刷新一次</span>
+  </div>
+
+  <div id="logs">Loading...</div>
+
+  <script>
+    const pathParts = location.pathname.split("/");
+    const endpoint = pathParts[1];
+    let autoRefreshInterval;
+    let lastLogs = [];
+
+    // 配置面板折叠控制
+    function toggleConfig() {
+      const content = document.getElementById('configContent');
+      const icon = document.querySelector('.toggle-icon');
+      content.classList.toggle('show');
+      icon.classList.toggle('open');
+    }
+
+    // 加载日志
+    function loadLogs() {
+      fetch(`/${endpoint}/api/logs`)
+        .then(res => res.json())
+        .then(logs => {
+          const container = document.getElementById("logs");
+          if (!logs.length) {
+            container.innerHTML = "<p>暂无记录</p>";
+            return;
+          }
+
+          // 比较新旧日志，为新日志添加高亮效果
+          const newLogs = logs.filter(log => 
+            !lastLogs.some(oldLog => 
+              oldLog.timestamp === log.timestamp && 
+              oldLog.method === log.method
+            )
+          );
+
+          container.innerHTML = logs.map(log => {
+            const isNew = newLogs.some(newLog => 
+              newLog.timestamp === log.timestamp && 
+              newLog.method === log.method
+            );
+            
+            // 构建查询参数字符串
+            const queryString = Object.entries(log.query || {})
+              .map(([key, value]) => `${key}=${value}`)
+              .join('&');
+            const queryDisplay = queryString ? `?${queryString}` : '';
+            
+            return `
+              <div class="log-entry ${isNew ? 'new-log' : ''}">
+                <strong>${log.method}</strong> 
+                <span class="path">${log.path}</span>
+                <span class="query">${queryDisplay}</span>
+                <em>${log.timestamp}</em><br/>
+                <pre>Headers:\n${JSON.stringify(log.headers, null, 2)}</pre>
+                <pre>Body:\n${log.body}</pre>
+              </div>
+            `;
+          }).join("");
+
+          lastLogs = logs;
+        });
+    }
+
+    // 自动刷新控制
+    function startAutoRefresh() {
+      autoRefreshInterval = setInterval(loadLogs, 3000);
+      document.getElementById('toggleRefresh').textContent = '停止自动刷新';
+      document.getElementById('toggleRefresh').classList.add('active');
+    }
+
+    function stopAutoRefresh() {
+      clearInterval(autoRefreshInterval);
+      document.getElementById('toggleRefresh').textContent = '开始自动刷新';
+      document.getElementById('toggleRefresh').classList.remove('active');
+    }
+
+    document.getElementById('toggleRefresh').addEventListener('click', function() {
+      if (autoRefreshInterval) {
+        stopAutoRefresh();
+      } else {
+        startAutoRefresh();
+      }
+    });
+
+    // 加载配置
+    fetch(`/${endpoint}/api/config`)
+      .then(res => res.json())
+      .then(config => {
+        document.getElementById('statusCode').value = config.statusCode || 200;
+        document.getElementById('headers').value = JSON.stringify(config.headers || {"Content-Type": "application/json"}, null, 2);
+        document.getElementById('body').value = JSON.stringify(config.body || {"message": "Hello World"}, null, 2);
+      })
+      .catch(() => {
+        // 如果没有配置，使用默认值
+      });
+
+    // 保存配置
+    document.getElementById('responseConfig').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const headers = JSON.parse(document.getElementById('headers').value);
+        const body = JSON.parse(document.getElementById('body').value);
+        const statusCode = parseInt(document.getElementById('statusCode').value);
+
+        const response = await fetch(`/${endpoint}/api/config`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            statusCode,
+            headers,
+            body
+          })
+        });
+
+        if (response.ok) {
+          alert('配置已保存');
+        } else {
+          throw new Error('保存失败');
+        }
+      } catch (err) {
+        alert('配置格式错误，请确保 Headers 和 Body 是有效的 JSON 格式');
+      }
+    });
+
+    // 初始加载日志并启动自动刷新
+    loadLogs();
+    startAutoRefresh();
+  </script>
+</body>
+</html>
